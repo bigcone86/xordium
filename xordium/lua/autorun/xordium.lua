@@ -22,7 +22,10 @@ if SERVER then
         return result
     end
 
-    -- ФУНКЦИЯ ВКЛЮЧЕНИЯ ЭФФЕКТОВ (Затемнение 64)
+    -- =========================================================
+    -- 1. ФУНКЦИИ ANNIHILATION
+    -- =========================================================
+
     local function ActivateGlobalEffects()
         for _, ply in pairs(player.GetAll()) do
             if IsValid(ply) then
@@ -31,7 +34,6 @@ if SERVER then
         end
     end
 
-    -- ФУНКЦИЯ ОТКЛЮЧЕНИЯ ЭФФЕКТОВ
     local function DeactivateGlobalEffects()
         for _, ply in pairs(player.GetAll()) do
             if IsValid(ply) then
@@ -40,17 +42,13 @@ if SERVER then
         end
     end
 
-    -- ФУНКЦИЯ СОЗДАНИЯ МОНСТРА ANNIHILATION
     local function SpawnAnnihilationMonster(spawnPos)
         local monster = ents.Create("npc_citizen")
         if not IsValid(monster) then return nil end
         
         monster:SetPos(spawnPos + Vector(0,0,20))
         monster:SetModel("models/humans/group01/male_06.mdl")
-        
-        -- Отключаем поиск сцен при спавне (убирает ошибку CSceneEntity)
-        monster:SetKeyValue("spawnflags", "1") 
-        
+        monster:SetKeyValue("spawnflags", "1") -- Отключает ошибку CSceneEntity
         monster:Spawn()
         
         monster:SetHealth(99999)
@@ -68,11 +66,9 @@ if SERVER then
         monster:EmitSound("ambient/levels/labs/teleport_mechanism.wav", 80, 50, 1, CHAN_AUTO)
         PrintMessage(HUD_PRINTTALK, "Annihilation.")
         
-        -- Включаем затемнение
         ActivateGlobalEffects()
 
-        -- Фора в 2 секунды
-        local chaseStartTime = CurTime() + 2
+        local chaseStartTime = CurTime() + 2 -- Фора 2 секунды
 
         timer.Create("AnnihilationChase_" .. monster:EntIndex(), 0.1, 0, function()
             if not IsValid(monster) then 
@@ -85,7 +81,6 @@ if SERVER then
 
             local monsterPos = monster:GetPos()
             
-            -- Проверяем: если на сервере нет живых игроков - монстр исчезает
             local alivePlayers = {}
             for _, ply in pairs(player.GetAll()) do
                 if IsValid(ply) and ply:Alive() then
@@ -103,7 +98,6 @@ if SERVER then
                 return
             end
 
-            -- Ищем ближайшего игрока
             local nearestDist = 99999
             local nearestPlayer = nil
 
@@ -125,13 +119,10 @@ if SERVER then
                 local ang = (targetPos - newPos):Angle()
                 monster:SetAngles(Angle(0, ang.yaw, 0))
 
-                -- КИК ПРИ КАСАНИИ (дистанция < 100)
                 if nearestDist < 100 then
                     local reason = GenerateKickReason()
                     nearestPlayer:Kick(reason)
-                    
-                    -- Сбрасываем цель, чтобы монстр сразу побежал к следующему
-                    nearestPlayer = nil 
+                    nearestPlayer = nil -- Сброс цели
                 end
             end
         end)
@@ -140,7 +131,6 @@ if SERVER then
         return monster
     end
 
-    -- ФУНКЦИЯ ВЫБОРА МЕСТА И СПАВНА ПЕРЕД ИГРОКОМ НА ЗЕМЛЕ
     local function TriggerAnnihilationSpawn()
         local players = player.GetAll()
         if #players == 0 then return end
@@ -156,15 +146,12 @@ if SERVER then
         local distance = math.random(250, 400)
         local spawnPos = targetPlayer:GetPos() + (dir * distance)
         
-        -- ОПТИМИЗИРОВАННЫЙ СПАВН НА ЗЕМЛЕ:
-        -- Пускаем луч вниз от заданной позиции, чтобы найти твёрдую поверхность
         local trace = util.TraceLine({
             start = spawnPos + Vector(0, 0, 100),
             endpos = spawnPos - Vector(0, 0, 1000),
             filter = targetPlayer
         })
         
-        -- Если луч нашёл землю, ставим монстра на неё, иначе ставим на уровне ног игрока
         if trace.Hit then
             spawnPos = trace.HitPos + Vector(0, 0, 5)
         else
@@ -174,36 +161,8 @@ if SERVER then
         SpawnAnnihilationMonster(spawnPos)
     end
 
-    -- Таймер спавна монстра каждые 15 МИНУТ (900 секунд)
-    timer.Create("AnnihilationSpawner", 900, 0, TriggerAnnihilationSpawn)
-    -- !!! ТЕСТОВЫЙ СПАВН УДАЛЁН. Монстр появится только через 15 минут или по команде !!!
-
     -- =========================================================
-    -- КОНСОЛЬНЫЕ КОМАНДЫ
-    -- =========================================================
-    
-    concommand.Add("xor_create", function(ply, cmd, args)
-        if args[1] == "tax" and args[2] == "collector" then 
-            SpawnTaxCollector() 
-        end
-        
-        if args[1] == "sigma" then
-            local target = ply
-            if IsValid(target) and target:Alive() then 
-                SpawnShadow(target) 
-            end
-        end
-        
-        if args[1] == "annihilation" then
-            local forward = ply:GetForward()
-            local spawnPos = ply:GetPos() + (forward * 200) + Vector(0, 0, 10)
-            SpawnAnnihilationMonster(spawnPos)
-            print("Annihilation spawned!")
-        end
-    end)
-
-    -- =========================================================
-    -- ДАЛЕЕ ВАШ СТАРЫЙ КОД (Красные NPC, Тени, Коллекторы)
+    -- 2. ФУНКЦИИ СТАРЫХ NPC (Красные, Тени, Коллекторы)
     -- =========================================================
 
     local function CheckPlayerDeaths()
@@ -309,16 +268,6 @@ if SERVER then
         end)
     end
     
-    hook.Add("PlayerSpawn", "CheckShadowSpawn", function(ply)
-        timer.Simple(5, function()
-            if IsValid(ply) and ply:Alive() then
-                if math.random(1, 100) <= 20 then
-                    SpawnShadow(ply)
-                end
-            end
-        end)
-    end)
-    
     local function CheckTaxCollectors()
         for _, data in pairs(taxCollectors) do
             local npc = data.npc
@@ -420,6 +369,10 @@ if SERVER then
             end
         end)
     end
+
+    -- =========================================================
+    -- 3. ФУНКЦИИ КРАСНЫХ NPC
+    -- =========================================================
     
     local function PlayCustomSound(npc, distance)
         if not IsValid(npc) then return end
@@ -541,13 +494,59 @@ if SERVER then
             end
         end)
     end
-    
+
+    -- =========================================================
+    -- 4. ТАЙМЕРЫ И ХУКИ (Спавн NPC)
+    -- =========================================================
+
+    -- Annihilation: 15 минут (900 секунд). Без тестового спавна!
+    timer.Create("AnnihilationSpawner", 900, 0, TriggerAnnihilationSpawn)
+
+    -- Красные NPC (150 секунд)
     timer.Create("CreepyNPC_Spawner", 150, 0, SpawnCreepyNPC)
     timer.Create("CheckPlayerDeaths", 0.2, 0, CheckPlayerDeaths)
     timer.Create("CheckTaxCollectors", 0.2, 0, CheckTaxCollectors)
     timer.Create("CheckShadows", 0.2, 0, CheckShadows)
     timer.Create("TaxCollectorSpawner", 300, 0, SpawnTaxCollector)
-    timer.Simple(5, SpawnTaxCollector)
+    timer.Simple(5, SpawnTaxCollector) -- Коллектор через 5 сек
+
+    hook.Add("PlayerSpawn", "CheckShadowSpawn", function(ply)
+        timer.Simple(5, function()
+            if IsValid(ply) and ply:Alive() then
+                if math.random(1, 100) <= 20 then
+                    SpawnShadow(ply)
+                end
+            end
+        end)
+    end)
+
+    -- =========================================================
+    -- 5. КОНСОЛЬНЫЕ КОМАНДЫ (Объявлены В КОНЦЕ, чтобы не было nil)
+    -- =========================================================
+    
+    concommand.Add("xor_create", function(ply, cmd, args)
+        if args[1] == "tax" and args[2] == "collector" then 
+            SpawnTaxCollector() 
+        end
+        
+        if args[1] == "sigma" then
+            local target = ply
+            if IsValid(target) and target:Alive() then 
+                SpawnShadow(target) 
+            end
+        end
+        
+        if args[1] == "annihilation" then
+            local forward = ply:GetForward()
+            local spawnPos = ply:GetPos() + (forward * 200) + Vector(0, 0, 10)
+            SpawnAnnihilationMonster(spawnPos)
+            print("Annihilation spawned!")
+        end
+    end)
+
+    -- =========================================================
+    -- 6. ОЧИСТКА КАРТЫ
+    -- =========================================================
     
     hook.Add("PostCleanupMap", "RemoveCreepyNPCs", function()
         for _, npc in pairs(creepyNPCs) do
@@ -573,7 +572,7 @@ if CLIENT then
     local targetShadowAlphaAnn = 0
     local shadowScreenAlphaAnn = 0
     
-    -- Переменные для старых эффектов (красный экран, тени)
+    -- Переменные для старых эффектов
     local redScreen = false
     local alpha = 0
     local targetAlpha = 0
@@ -597,7 +596,6 @@ if CLIENT then
         redScreen = false
         isChasedByShadow = false
         
-        -- Проверка красных NPC
         for _, npc in pairs(ents.FindByClass("npc_citizen")) do
             if IsValid(npc) and npc:GetMaterial() == "models/props_combine/portalball" and npc:GetColor() == Color(255, 0, 0, 200) then
                 local distance = ply:GetPos():Distance(npc:GetPos())
@@ -609,7 +607,6 @@ if CLIENT then
             end
         end
         
-        -- Проверка старых теней (192)
         for _, npc in pairs(ents.FindByClass("npc_citizen")) do
             if IsValid(npc) and npc:GetColor() == Color(0, 0, 0, 255) and npc:GetMaterial() == "models/props_combine/portalball" then
                 isChasedByShadow = true
@@ -623,8 +620,6 @@ if CLIENT then
         
         alpha = math.Approach(alpha, targetAlpha, FrameTime() * 300)
         shadowScreenAlphaOld = math.Approach(shadowScreenAlphaOld, targetShadowAlphaOld, FrameTime() * 200)
-        
-        -- Обновление глобального эффекта Annihilation (64)
         shadowScreenAlphaAnn = math.Approach(shadowScreenAlphaAnn, targetShadowAlphaAnn, FrameTime() * 300)
     end)
     
@@ -632,7 +627,6 @@ if CLIENT then
         local ply = LocalPlayer()
         if not IsValid(ply) then return end
         
-        -- Эффект старой тени (символ суммы)
         if not ply:Alive() and showSumSymbol then
             sumAlpha = math.Approach(sumAlpha, 255, FrameTime() * 500)
             surface.SetDrawColor(Color(0, 0, 0, sumAlpha))
@@ -646,13 +640,11 @@ if CLIENT then
             sumAlpha = math.Approach(sumAlpha, 0, FrameTime() * 200)
         end
         
-        -- Эффект старых теней (192)
         if shadowScreenAlphaOld > 0 then
             surface.SetDrawColor(Color(0, 0, 0, shadowScreenAlphaOld))
             surface.DrawRect(0, 0, ScrW(), ScrH())
         end
         
-        -- Эффект Красного экрана
         if alpha > 0 then
             surface.SetDrawColor(Color(255, 0, 0, alpha))
             surface.DrawRect(0, 0, ScrW(), ScrH())
