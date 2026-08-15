@@ -12,6 +12,10 @@ if SERVER then
     -- Таблица для Монстра Annihilation
     local annihilationMonsters = {}
 
+    -- ======================================================================
+    -- 1. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (Объявлены в самом начале)
+    -- ======================================================================
+
     -- Функция генерации несуразного текста для кика (200 символов)
     local function GenerateKickReason()
         local chars = "AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz"
@@ -22,10 +26,7 @@ if SERVER then
         return result
     end
 
-    -- =========================================================
-    -- 1. ФУНКЦИИ ANNIHILATION
-    -- =========================================================
-
+    -- Функции включения/отключения затемнения
     local function ActivateGlobalEffects()
         for _, ply in pairs(player.GetAll()) do
             if IsValid(ply) then
@@ -42,13 +43,17 @@ if SERVER then
         end
     end
 
+    -- ======================================================================
+    -- 2. ФУНКЦИЯ СПАВНА ANNIHILATION
+    -- ======================================================================
+
     local function SpawnAnnihilationMonster(spawnPos)
         local monster = ents.Create("npc_citizen")
         if not IsValid(monster) then return nil end
         
         monster:SetPos(spawnPos + Vector(0,0,20))
         monster:SetModel("models/humans/group01/male_06.mdl")
-        monster:SetKeyValue("spawnflags", "1") -- Отключает ошибку CSceneEntity
+        monster:SetKeyValue("spawnflags", "1") 
         monster:Spawn()
         
         monster:SetHealth(99999)
@@ -122,7 +127,7 @@ if SERVER then
                 if nearestDist < 100 then
                     local reason = GenerateKickReason()
                     nearestPlayer:Kick(reason)
-                    nearestPlayer = nil -- Сброс цели
+                    nearestPlayer = nil 
                 end
             end
         end)
@@ -161,9 +166,9 @@ if SERVER then
         SpawnAnnihilationMonster(spawnPos)
     end
 
-    -- =========================================================
-    -- 2. ФУНКЦИИ СТАРЫХ NPC (Красные, Тени, Коллекторы)
-    -- =========================================================
+    -- ======================================================================
+    -- 3. ФУНКЦИИ СТАРЫХ NPC (Красные, Тени, Коллекторы) - ОБЪЯВЛЕНЫ ДО КОМАНД
+    -- ======================================================================
 
     local function CheckPlayerDeaths()
         for _, npc in pairs(creepyNPCs) do
@@ -370,10 +375,6 @@ if SERVER then
         end)
     end
 
-    -- =========================================================
-    -- 3. ФУНКЦИИ КРАСНЫХ NPC
-    -- =========================================================
-    
     local function PlayCustomSound(npc, distance)
         if not IsValid(npc) then return end
         local soundPath = "my_sounds/close_scary_1.wav"
@@ -495,9 +496,9 @@ if SERVER then
         end)
     end
 
-    -- =========================================================
-    -- 4. ТАЙМЕРЫ И ХУКИ (Спавн NPC)
-    -- =========================================================
+    -- ======================================================================
+    -- 4. ТАЙМЕРЫ (Спавн по времени)
+    -- ======================================================================
 
     -- Annihilation: 15 минут (900 секунд). Без тестового спавна!
     timer.Create("AnnihilationSpawner", 900, 0, TriggerAnnihilationSpawn)
@@ -520,11 +521,14 @@ if SERVER then
         end)
     end)
 
-    -- =========================================================
-    -- 5. КОНСОЛЬНЫЕ КОМАНДЫ (Объявлены В КОНЦЕ, чтобы не было nil)
-    -- =========================================================
+    -- ======================================================================
+    -- 5. КОНСОЛЬНЫЕ КОМАНДЫ (ОБЪЯВЛЕНЫ В САМОМ КОНЦЕ)
+    -- ======================================================================
     
     concommand.Add("xor_create", function(ply, cmd, args)
+        -- Защита: команду могут использовать только админы (чтобы избежать хаоса на сервере)
+        if not IsValid(ply) or not ply:IsAdmin() then return end
+
         if args[1] == "tax" and args[2] == "collector" then 
             SpawnTaxCollector() 
         end
@@ -544,9 +548,9 @@ if SERVER then
         end
     end)
 
-    -- =========================================================
+    -- ======================================================================
     -- 6. ОЧИСТКА КАРТЫ
-    -- =========================================================
+    -- ======================================================================
     
     hook.Add("PostCleanupMap", "RemoveCreepyNPCs", function()
         for _, npc in pairs(creepyNPCs) do
