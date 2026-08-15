@@ -48,7 +48,7 @@ if SERVER then
         monster:SetPos(spawnPos + Vector(0,0,20))
         monster:SetModel("models/humans/group01/male_06.mdl")
         
-        -- ИСПРАВЛЕНИЕ ОШИБКИ: Отключаем поиск сцен при спавне
+        -- Отключаем поиск сцен при спавне (убирает ошибку CSceneEntity)
         monster:SetKeyValue("spawnflags", "1") 
         
         monster:Spawn()
@@ -85,7 +85,7 @@ if SERVER then
 
             local monsterPos = monster:GetPos()
             
-            -- Проверяем: если на сервере ВООБЩЕ нет живых игроков - монстр исчезает
+            -- Проверяем: если на сервере нет живых игроков - монстр исчезает
             local alivePlayers = {}
             for _, ply in pairs(player.GetAll()) do
                 if IsValid(ply) and ply:Alive() then
@@ -94,7 +94,6 @@ if SERVER then
             end
 
             if #alivePlayers == 0 then
-                -- Все мертвы (или никого нет) - удаляем монстра
                 if IsValid(monster) then
                     timer.Remove("AnnihilationChase_" .. monster:EntIndex())
                     monster:Remove()
@@ -141,7 +140,7 @@ if SERVER then
         return monster
     end
 
-    -- ФУНКЦИЯ ВЫБОРА МЕСТА И СПАВНА ПЕРЕД ИГРОКОМ
+    -- ФУНКЦИЯ ВЫБОРА МЕСТА И СПАВНА ПЕРЕД ИГРОКОМ НА ЗЕМЛЕ
     local function TriggerAnnihilationSpawn()
         local players = player.GetAll()
         if #players == 0 then return end
@@ -157,12 +156,15 @@ if SERVER then
         local distance = math.random(250, 400)
         local spawnPos = targetPlayer:GetPos() + (dir * distance)
         
+        -- ОПТИМИЗИРОВАННЫЙ СПАВН НА ЗЕМЛЕ:
+        -- Пускаем луч вниз от заданной позиции, чтобы найти твёрдую поверхность
         local trace = util.TraceLine({
             start = spawnPos + Vector(0, 0, 100),
             endpos = spawnPos - Vector(0, 0, 1000),
             filter = targetPlayer
         })
         
+        -- Если луч нашёл землю, ставим монстра на неё, иначе ставим на уровне ног игрока
         if trace.Hit then
             spawnPos = trace.HitPos + Vector(0, 0, 5)
         else
@@ -174,7 +176,7 @@ if SERVER then
 
     -- Таймер спавна монстра каждые 15 МИНУТ (900 секунд)
     timer.Create("AnnihilationSpawner", 900, 0, TriggerAnnihilationSpawn)
-    timer.Simple(10, TriggerAnnihilationSpawn)
+    -- !!! ТЕСТОВЫЙ СПАВН УДАЛЁН. Монстр появится только через 15 минут или по команде !!!
 
     -- =========================================================
     -- КОНСОЛЬНЫЕ КОМАНДЫ
